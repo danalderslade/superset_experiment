@@ -1,0 +1,134 @@
+version: "3.8"
+
+# ── image & volume anchors ────────────────────────────────────────────────────
+x-superset-image: &superset-image apache/superset:4.1.1
+
+x-superset-depends-on: &superset-depends-on
+  - db
+  - redis
+
+x-superset-volumes: &superset-volumes
+  - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+  - superset_home:/app/superset_home
+
+# ── shared environment (avoids duplicating SECRET_KEY) ───────────────────────
+x-superset-env: &superset-env
+  SUPERSET_ENV: production
+  SUPERSET_LOAD_EXAMPLES: "no"
+  DATABASE_HOST: db
+  DATABASE_PORT: 5432
+  DATABASE_DB: ${DATABASE_DB:-superset}
+  DATABASE_USER: ${DATABASE_USER:-superset}
+  DATABASE_PASSWORD: ${DATABASE_PASSWORD:-superset}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  # SECRET_KEY: set in .env (copy from .env.example).
+  # A default is provided here only so the stack starts without a .env file.
+  # Change this before exposing the service on a network.
+  SECRET_KEY: ${SECRET_KEY:-change-me-generate-a-strong-random-secret-key}
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: superset_cache
+    restart: unless-stopped
+    volumes:
+      - redis:/data
+
+  db:
+    image: postgres:15-alpine
+    container_name: superset_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_DB:-superset}
+      POSTGRES_USER: ${DATABASE_USER:-superset}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-superset}
+    volumes:
+      - db_home:/var/lib/postgresql/data
+
+  mock_data_db:
+    image: postgres:15-alpine
+    container_name: mock_data_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MOCK_DB_NAME:-financial_crime}
+      POSTGRES_USER: ${MOCK_DB_USER:-analyst}
+      POSTGRES_PASSWORD: ${MOCK_DB_PASSWORD:-analyst}
+    volumes:
+      - mock_db_home:/var/lib/postgresql/data
+      - ./data/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./data/mock_data.sql:/docker-entrypoint-initdb.d/02_mock_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MOCK_DB_USER:-analyst} -d ${MOCK_DB_NAME:-financial_crime}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  superset:
+    image: *superset-image
+    container_name: superset_app
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "/app/docker/docker-bootstrap.sh app-gunicorn"]
+    user: "root"
+    ports:
+      - "8088:8088"
+    depends_on: *superset-depends-on
+    volumes: *superset-volumes
+    environment:
+      <<: *superset-env
+      SUPERSET_PORT: 8088
+      CYPRESS_CONFIG: "false"
+
+  superset-init:
+    image: *superset-image
+    container_name: superset_init
+    command: ["/bin/sh", "-c", "/app/docker/docker-init.sh"]
+    depends_on: *superset-depends-on
+    user: "root"
+    volumes: *superset-volumes
+    environment:
+      <<: *superset-env
+      CYPRESS_CONFIG: "false"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_FIRSTNAME: Admin
+      ADMIN_LASTNAME: User
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@superset.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+    healthcheck:
+      disable: true
+
+  superset-worker:
+    image: *superset-image
+    container_name: superset_worker
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "/app/docker/docker-bootstrap.sh worker"]
+    depends_on: *superset-depends-on
+    user: "root"
+    volumes: *superset-volumes
+    environment:
+      <<: *superset-env
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME",
+        ]
+
+  superset-worker-beat:
+    image: *superset-image
+    container_name: superset_worker_beat
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "/app/docker/docker-bootstrap.sh beat"]
+    depends_on: *superset-depends-on
+    user: "root"
+    volumes: *superset-volumes
+    environment:
+      <<: *superset-env
+    healthcheck:
+      disable: true
+
+volumes:
+  superset_home:
+  db_home:
+  mock_db_home:
+  redis:
