@@ -1,0 +1,201 @@
+{
+  "_comment": "Superset Dashboard Import Specification - FCM Intelligence Hub POC. Import via Superset UI: Dashboards → Import → upload this file.",
+  "metadata": {
+    "type": "Dashboard",
+    "api_version": "1.0",
+    "timestamp": "2026-03-24T00:00:00+00:00"
+  },
+
+  "dashboards": [
+
+    {
+      "slug": "fcm-operational-overview",
+      "title": "FCM: Operational Overview",
+      "description": "Real-time case pipeline: open cases, SLA status, workflow stages and escalations across all regions and teams.",
+      "published": true,
+      "position": {
+        "HEADER": { "type": "HEADER", "meta": { "text": "Financial Crime Case Management — Operational Overview" } },
+
+        "ROW_KPI": {
+          "type": "ROW", "meta": { "background": "BACKGROUND_TRANSPARENT" },
+          "children": ["BIG_TOTAL_OPEN","BIG_SLA_BREACHED","BIG_ESCALATED","BIG_PENDING_SAR","BIG_CLOSED_TODAY"]
+        },
+        "BIG_TOTAL_OPEN":    { "type": "CHART", "meta": { "chartId": "total_open_cases",       "width": 2, "height": 1 } },
+        "BIG_SLA_BREACHED":  { "type": "CHART", "meta": { "chartId": "sla_breached_count",     "width": 2, "height": 1 } },
+        "BIG_ESCALATED":     { "type": "CHART", "meta": { "chartId": "escalated_count",        "width": 2, "height": 1 } },
+        "BIG_PENDING_SAR":   { "type": "CHART", "meta": { "chartId": "pending_sar_count",      "width": 2, "height": 1 } },
+        "BIG_CLOSED_TODAY":  { "type": "CHART", "meta": { "chartId": "closed_today_count",     "width": 2, "height": 1 } },
+
+        "ROW_PIPELINE": {
+          "type": "ROW", "meta": {},
+          "children": ["FUNNEL_WORKFLOW","BAR_CASES_BY_STAGE"]
+        },
+        "FUNNEL_WORKFLOW":   { "type": "CHART", "meta": { "chartId": "workflow_funnel",        "width": 5, "height": 3 } },
+        "BAR_CASES_BY_STAGE":{ "type": "CHART", "meta": { "chartId": "cases_by_stage_bar",    "width": 7, "height": 3 } },
+
+        "ROW_REGION_TEAM": {
+          "type": "ROW", "meta": {},
+          "children": ["MAP_CASES_REGION","BAR_BY_TEAM"]
+        },
+        "MAP_CASES_REGION":  { "type": "CHART", "meta": { "chartId": "cases_by_region_map",   "width": 6, "height": 4 } },
+        "BAR_BY_TEAM":       { "type": "CHART", "meta": { "chartId": "open_cases_by_team",    "width": 6, "height": 4 } },
+
+        "ROW_CRIME_SLA": {
+          "type": "ROW", "meta": {},
+          "children": ["PIE_CRIME_CATEGORY","GAUGE_SLA"]
+        },
+        "PIE_CRIME_CATEGORY":{ "type": "CHART", "meta": { "chartId": "cases_by_crime_category","width": 5, "height": 3 } },
+        "GAUGE_SLA":         { "type": "CHART", "meta": { "chartId": "sla_compliance_gauge",  "width": 7, "height": 3 } },
+
+        "ROW_TREND": {
+          "type": "ROW", "meta": {},
+          "children": ["LINE_DAILY_VOLUME"]
+        },
+        "LINE_DAILY_VOLUME": { "type": "CHART", "meta": { "chartId": "daily_case_volume_line","width": 12, "height": 3 } },
+
+        "ROW_TABLE": {
+          "type": "ROW", "meta": {},
+          "children": ["TABLE_OPEN_CASES"]
+        },
+        "TABLE_OPEN_CASES":  { "type": "CHART", "meta": { "chartId": "open_cases_drill_table","width": 12, "height": 5 } }
+      },
+
+      "filters": [
+        { "type": "filter_select", "targets": ["case_status"],    "label": "Case Status",     "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["region_name"],    "label": "Region",         "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["country_name"],   "label": "Country",        "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["team_name"],      "label": "Team",           "dataset": "vw_case_operational_summary", "cascades_from": "region_name" },
+        { "type": "filter_select", "targets": ["crime_category"], "label": "Crime Category", "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["risk_level"],     "label": "Risk Level",     "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["workflow_stage"], "label": "Workflow Stage", "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["priority_name"],  "label": "Priority",       "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["channel_name"],   "label": "Channel",        "dataset": "vw_case_operational_summary" },
+        { "type": "filter_time",   "targets": ["opened_date"],    "label": "Opened Date Range" },
+        { "type": "filter_range",  "targets": ["actual_days_open"],"label": "Case Age (days)" }
+      ]
+    },
+
+    {
+      "slug": "fcm-sla-performance",
+      "title": "FCM: SLA & Performance Analytics",
+      "description": "SLA compliance rates, breach root-cause analysis, team throughput and average case age — sliced by risk level, region and crime type.",
+      "published": true,
+
+      "filters": [
+        { "type": "filter_select", "targets": ["region_name"],    "label": "Region",         "dataset": "vw_sla_performance" },
+        { "type": "filter_select", "targets": ["team_name"],      "label": "Team",           "dataset": "vw_sla_performance" },
+        { "type": "filter_select", "targets": ["risk_level"],     "label": "Risk Level",     "dataset": "vw_sla_performance" },
+        { "type": "filter_select", "targets": ["crime_category"], "label": "Crime Category", "dataset": "vw_sla_performance" },
+        { "type": "filter_time",   "targets": ["cohort_month"],   "label": "Cohort Month" }
+      ],
+
+      "charts": [
+        { "id": "sla_compliance_by_team_bar",    "type": "bar",          "dataset": "vw_sla_performance",  "title": "SLA Compliance % by Team",          "x": "team_name",      "y": "sla_compliance_pct",  "color": "team_type" },
+        { "id": "sla_trend_line",                "type": "line",         "dataset": "vw_sla_performance",  "title": "SLA Compliance Trend Over Time",    "x": "cohort_month",   "y": "sla_compliance_pct",  "breakdown": "region_name" },
+        { "id": "breach_by_crime_type",          "type": "bar",          "dataset": "vw_sla_performance",  "title": "SLA Breaches by Crime Category",    "x": "crime_category", "y": "closed_sla_breached",  "sort": "desc" },
+        { "id": "breach_by_risk_level",          "type": "pie",          "dataset": "vw_sla_performance",  "title": "SLA Breaches by Risk Level",        "dimension": "risk_level", "metric": "closed_sla_breached" },
+        { "id": "avg_days_heatmap",              "type": "heatmap",      "dataset": "vw_sla_performance",  "title": "Avg Days Open: Team × Risk Level",  "x": "team_name",      "y": "risk_level",          "metric": "avg_days_open" },
+        { "id": "p90_age_by_region",             "type": "bar",          "dataset": "vw_sla_performance",  "title": "P90 Case Age by Region",            "x": "region_name",    "y": "p90_days_open" },
+        { "id": "throughput_by_month",           "type": "bar",          "dataset": "vw_sla_performance",  "title": "Monthly Throughput: Opened vs Closed","x": "cohort_month", "metrics": ["total_cases","closed_cases"], "stacked": false }
+      ]
+    },
+
+    {
+      "slug": "fcm-team-workload",
+      "title": "FCM: Team & Analyst Workload",
+      "description": "Analyst capacity utilisation, open caseload per FTE, high-risk case distribution and escalation hotspots.",
+      "published": true,
+
+      "filters": [
+        { "type": "filter_select", "targets": ["region_name"],  "label": "Region", "dataset": "vw_team_workload" },
+        { "type": "filter_select", "targets": ["team_name"],    "label": "Team",   "dataset": "vw_team_workload" },
+        { "type": "filter_select", "targets": ["team_type"],    "label": "Team Type","dataset": "vw_team_workload" },
+        { "type": "filter_select", "targets": ["grade"],        "label": "Analyst Grade","dataset": "vw_team_workload" }
+      ],
+
+      "charts": [
+        { "id": "cases_per_fte_bar",         "type": "bar",    "dataset": "vw_team_workload", "title": "Open Cases per FTE by Team",        "x": "team_name",       "y": "cases_per_fte",       "sort": "desc" },
+        { "id": "critical_open_heatmap",     "type": "heatmap","dataset": "vw_team_workload", "title": "Critical Open Cases: Region × Team","x": "region_name",     "y": "team_name",           "metric": "critical_open_cases" },
+        { "id": "open_by_analyst_bar",       "type": "bar",    "dataset": "vw_team_workload", "title": "Open Caseload by Analyst (Top 30)", "x": "analyst_name",    "y": "open_cases",          "limit": 30 },
+        { "id": "sla_breached_open_scatter", "type": "scatter","dataset": "vw_team_workload", "title": "Caseload vs SLA Risk (Analyst)",   "x": "open_cases",      "y": "sla_breached_open",   "size": "avg_open_case_age", "color": "team_type" },
+        { "id": "pending_info_table",        "type": "table",  "dataset": "vw_team_workload", "title": "Pending-Information Cases by Analyst","columns": ["analyst_name","team_name","region_name","pending_info_cases","open_cases","sla_breached_open"] },
+        { "id": "escalated_by_team_pie",     "type": "pie",    "dataset": "vw_team_workload", "title": "Escalated Cases by Team",          "dimension": "team_name","metric": "escalated_cases" }
+      ]
+    },
+
+    {
+      "slug": "fcm-crime-intelligence",
+      "title": "FCM: Crime Type Intelligence",
+      "description": "Financial crime typology breakdown, emerging trends by crime category, geographic hotspots and alert-to-case conversion rates.",
+      "published": true,
+
+      "filters": [
+        { "type": "filter_select", "targets": ["region_name"],    "label": "Region",         "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["country_name"],   "label": "Country",        "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["crime_category"], "label": "Crime Category", "dataset": "vw_case_operational_summary" },
+        { "type": "filter_select", "targets": ["channel_name"],   "label": "Channel",        "dataset": "vw_case_operational_summary" },
+        { "type": "filter_time",   "targets": ["opened_date"],    "label": "Date Range" }
+      ],
+
+      "charts": [
+        { "id": "crime_type_treemap",        "type": "treemap",   "dataset": "vw_case_operational_summary", "title": "Case Volume by Crime Type",             "dimension": "crime_type_name",  "metric": "count" },
+        { "id": "crime_trend_area",          "type": "area",      "dataset": "vw_case_operational_summary", "title": "Crime Category Trend Over Time",        "x": "opened_month",             "y": "count",         "breakdown": "crime_category" },
+        { "id": "crime_by_channel_heatmap",  "type": "heatmap",   "dataset": "vw_case_operational_summary", "title": "Crime Type vs Channel Heatmap",         "x": "channel_name",             "y": "crime_category","metric": "count" },
+        { "id": "pep_sanction_flags_bar",    "type": "bar",       "dataset": "vw_case_operational_summary", "title": "PEP / Sanctioned Entity Cases by Region","x": "region_name",              "metrics": ["involves_pep","involves_sanctioned_entity"] },
+        { "id": "cross_border_pie",          "type": "pie",       "dataset": "vw_case_operational_summary", "title": "Cross-Border vs Domestic Cases",        "dimension": "cross_border",     "metric": "count" },
+        { "id": "alert_conversion_bar",      "type": "bar",       "dataset": "vw_alert_to_case_conversion", "title": "Alert Conversion Rate by Type",         "x": "alert_type",               "y": "case_conversion_rate_pct" },
+        { "id": "false_pos_rate_trend",      "type": "line",      "dataset": "vw_alert_to_case_conversion", "title": "False Positive Rate Trend",             "x": "alert_month",              "y": "false_positive_rate_pct",   "breakdown": "alert_type" },
+        { "id": "country_risk_map",          "type": "world_map", "dataset": "vw_case_operational_summary", "title": "Case Density by Country",               "country_field": "country_code", "metric": "count",    "color_metric": "sla_breached" }
+      ]
+    },
+
+    {
+      "slug": "fcm-financial-exposure",
+      "title": "FCM: Financial Exposure & Recovery",
+      "description": "Estimated value at risk, confirmed losses, recovery rates and SAR intelligence across entities, geographies and crime types.",
+      "published": true,
+
+      "filters": [
+        { "type": "filter_select", "targets": ["region_name"],    "label": "Region",         "dataset": "vw_financial_exposure" },
+        { "type": "filter_select", "targets": ["crime_category"], "label": "Crime Category", "dataset": "vw_financial_exposure" },
+        { "type": "filter_select", "targets": ["risk_level"],     "label": "Risk Level",     "dataset": "vw_financial_exposure" },
+        { "type": "filter_select", "targets": ["entity_name"],    "label": "Entity",         "dataset": "vw_financial_exposure" },
+        { "type": "filter_time",   "targets": ["opened_quarter"], "label": "Quarter" }
+      ],
+
+      "charts": [
+        { "id": "value_at_risk_by_region",   "type": "bar",       "dataset": "vw_financial_exposure",  "title": "Estimated Value at Risk by Region",     "x": "region_name",     "y": "total_estimated_usd",      "sort": "desc" },
+        { "id": "loss_vs_recovered_stacked", "type": "bar",       "dataset": "vw_financial_exposure",  "title": "Confirmed Loss vs Recovered by Quarter","x": "opened_quarter",  "metrics": ["total_confirmed_loss_usd","total_recovered_usd"], "stacked": true },
+        { "id": "recovery_rate_by_crime",    "type": "bar",       "dataset": "vw_financial_exposure",  "title": "Recovery Rate % by Crime Category",     "x": "crime_category",  "y": "recovery_rate_pct" },
+        { "id": "exposure_scatter",          "type": "scatter",   "dataset": "vw_financial_exposure",  "title": "Case Count vs Total Exposure (Entity)", "x": "case_count",      "y": "total_estimated_usd",      "size": "recovery_rate_pct", "color": "region_name" },
+        { "id": "sar_by_authority",          "type": "bar",       "dataset": "vw_sar_intelligence",    "title": "SARs Filed by Reporting Authority",     "x": "reporting_authority","y": "count",                "sort": "desc" },
+        { "id": "sar_trend_line",            "type": "line",      "dataset": "vw_sar_intelligence",    "title": "SAR Filing Trend by Month",             "x": "filed_month",     "y": "count",                    "breakdown": "crime_category" },
+        { "id": "consent_rate_gauge",        "type": "gauge",     "dataset": "vw_sar_intelligence",    "title": "DAML Consent Grant Rate",               "metric": "consent_granted_pct" }
+      ]
+    },
+
+    {
+      "slug": "fcm-executive-summary",
+      "title": "FCM: Executive Summary",
+      "description": "Senior management one-page view: global KPIs, regional performance, top risk indicators and monthly trend.",
+      "published": true,
+
+      "filters": [
+        { "type": "filter_time",   "targets": ["opened_date"],   "label": "Reporting Period", "default": "last 90 days" },
+        { "type": "filter_select", "targets": ["region_name"],   "label": "Region",          "dataset": "vw_case_operational_summary" }
+      ],
+
+      "charts": [
+        { "id": "exec_big_open",        "type": "big_number",   "dataset": "vw_case_operational_summary", "title": "Total Open Cases",           "metric": "count",                        "filter": "case_status NOT IN ('closed','withdrawn')" },
+        { "id": "exec_big_sla",         "type": "big_number",   "dataset": "vw_sla_performance",          "title": "Global SLA Compliance %",    "metric": "avg(sla_compliance_pct)" },
+        { "id": "exec_big_value",       "type": "big_number",   "dataset": "vw_financial_exposure",       "title": "Total Value at Risk (USD)",  "metric": "sum(total_estimated_usd)" },
+        { "id": "exec_big_sars",        "type": "big_number",   "dataset": "vw_sar_intelligence",         "title": "SARs Filed (Period)",        "metric": "count" },
+        { "id": "exec_region_bar",      "type": "bar",          "dataset": "vw_sla_performance",          "title": "Open Cases by Region",       "x": "region_name",      "y": "cases_open" },
+        { "id": "exec_risk_donut",      "type": "donut",        "dataset": "vw_case_operational_summary", "title": "Cases by Risk Level",        "dimension": "risk_level","metric": "count" },
+        { "id": "exec_trend",           "type": "area",         "dataset": "vw_sla_performance",          "title": "Monthly Inflow vs Closure",  "x": "cohort_month",     "metrics": ["total_cases","closed_cases"] },
+        { "id": "exec_crime_treemap",   "type": "treemap",      "dataset": "vw_case_operational_summary", "title": "Crime Category Exposure",   "dimension": "crime_category","metric": "sum(estimated_value_usd)" },
+        { "id": "exec_top_teams_table", "type": "table",        "dataset": "vw_sla_performance",          "title": "Top Teams by Breach Count",  "columns": ["team_name","total_cases","closed_sla_breached","sla_compliance_pct","avg_days_open"], "sort_by": "closed_sla_breached", "limit": 10 }
+      ]
+    }
+  ]
+}

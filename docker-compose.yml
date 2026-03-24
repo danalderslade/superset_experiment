@@ -1,0 +1,173 @@
+version: "3.9"
+
+# =============================================================================
+# Financial Crime Case Management - Apache Superset POC
+# =============================================================================
+#
+# Services:
+#   postgres   - Primary data warehouse (FCM schema)
+#   redis      - Superset caching / Celery broker
+#   superset   - Apache Superset web application
+#   worker     - Superset async query worker
+#   beat       - Superset Celery beat scheduler
+#   init       - One-shot container: schema + seed + sample data
+#
+# Usage:
+#   docker compose up -d
+#   Open http://localhost:8088  (admin / admin)
+# =============================================================================
+
+x-superset-env: &superset-env
+  SUPERSET_SECRET_KEY: "fcm_poc_super_secret_key_change_in_prod_32chars"
+  SUPERSET_ADMIN_USERNAME: admin
+  SUPERSET_ADMIN_PASSWORD: admin
+  SUPERSET_ADMIN_EMAIL: admin@fcm-poc.local
+  SQLALCHEMY_DATABASE_URI: "postgresql+psycopg2://superset_user:superset_password@postgres:5432/superset"
+  REDIS_URL: "redis://redis:6379/0"
+  # FCM datasource (exposed to Superset as a connected database)
+  FCM_DB_URI: "postgresql+psycopg2://fcm_user:fcm_password@postgres:5432/fcm_poc"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: fcm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_MULTIPLE_DATABASES: "fcm_poc,superset"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/00_init-multiple-dbs.sh
+      - ./docker/postgres/create-users.sql:/docker-entrypoint-initdb.d/01_create-users.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fcm_net
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fcm_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fcm_net
+
+  # ── Schema + Data Init ──────────────────────────────────────────────────────
+  db_init:
+    image: python:3.12-slim
+    container_name: fcm_db_init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: fcm_password
+      FCM_DB_HOST: postgres
+    volumes:
+      - ./db:/app/db
+      - ./scripts:/app/scripts
+    working_dir: /app
+    command: >
+      bash -c "
+        apt-get update -qq && apt-get install -y -qq postgresql-client &&
+        pip install --quiet psycopg2-binary &&
+        echo 'Loading schema…' &&
+        psql -h postgres -U fcm_user -d fcm_poc -f db/01_schema.sql &&
+        echo 'Loading seed data…' &&
+        psql -h postgres -U fcm_user -d fcm_poc -f db/02_seed_reference_data.sql &&
+        echo 'Generating sample cases…' &&
+        python scripts/generate_sample_data.py &&
+        echo 'Database ready.'
+      "
+    networks:
+      - fcm_net
+
+  # ── Apache Superset ─────────────────────────────────────────────────────────
+  superset:
+    image: apache/superset:4.1.1
+    container_name: fcm_superset
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    environment:
+      <<: *superset-env
+      SUPERSET_LOAD_EXAMPLES: "false"
+    volumes:
+      - ./docker/superset/superset_config.py:/app/pythonpath/superset_config.py
+      - ./docker/superset/init_superset.sh:/app/docker/init_superset.sh
+      - superset_home:/app/superset_home
+    ports:
+      - "8088:8088"
+    command: >
+      bash -c "
+        pip install --quiet psycopg2-binary &&
+        superset db upgrade &&
+        superset fab create-admin --username $$SUPERSET_ADMIN_USERNAME --firstname Admin --lastname User --email $$SUPERSET_ADMIN_EMAIL --password $$SUPERSET_ADMIN_PASSWORD || true &&
+        superset init &&
+        bash /app/docker/init_superset.sh &&
+        gunicorn --bind 0.0.0.0:8088 --workers 4 --worker-class gthread --threads 2 --timeout 120 --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()'
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - fcm_net
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  worker:
+    image: apache/superset:4.1.1
+    container_name: fcm_superset_worker
+    restart: unless-stopped
+    depends_on:
+      superset:
+        condition: service_healthy
+    environment:
+      <<: *superset-env
+    volumes:
+      - ./docker/superset/superset_config.py:/app/pythonpath/superset_config.py
+      - superset_home:/app/superset_home
+    command: bash -c "pip install --quiet psycopg2-binary && celery --app=superset.tasks.celery_app:app worker --loglevel=INFO"
+    networks:
+      - fcm_net
+
+  # ── Celery Beat ─────────────────────────────────────────────────────────────
+  beat:
+    image: apache/superset:4.1.1
+    container_name: fcm_superset_beat
+    restart: unless-stopped
+    depends_on:
+      superset:
+        condition: service_healthy
+    environment:
+      <<: *superset-env
+    volumes:
+      - ./docker/superset/superset_config.py:/app/pythonpath/superset_config.py
+      - superset_home:/app/superset_home
+    command: bash -c "pip install --quiet psycopg2-binary && celery --app=superset.tasks.celery_app:app beat --loglevel=INFO"
+    networks:
+      - fcm_net
+
+volumes:
+  postgres_data:
+  superset_home:
+
+networks:
+  fcm_net:
+    driver: bridge
